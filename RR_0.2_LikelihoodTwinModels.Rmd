@@ -7,14 +7,6 @@ output:
     code_folding: "show"
 ---
 
-```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
-
-library(knitr)
-include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood_1.gif")
-
-include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood2.gif")
-
-```
 
 # Likelihood of twin models
 
