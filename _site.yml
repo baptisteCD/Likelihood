@@ -1,0 +1,15 @@
+name: "Likelihood"
+output_dir: "."
+navbar:
+  title: "Likelihood theory and visualisation"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "1 Likelihood of twin models"
+      href: RR_0.2_LikelihoodTwinModels.html
+    - text: "2 Practical"
+      href: RR_0.3_Practical.html
+    - text: "2 Code - likelihood of coin and linear model"
+      href: RR_1_CouvyDuchesne_ISGW_coinLinearModelLikelihoodPlots.html
+    - text: "2 Code - likelihood of twin model"
+      href: RR_2_CouvyDuchesne_ISGW_WorkshopDay2_ACE_Likelihood.html    

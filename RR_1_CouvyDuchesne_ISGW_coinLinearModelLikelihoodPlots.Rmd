@@ -1,0 +1,429 @@
+---
+title: "Likelihood plots - coin flip and linear model"
+author: "by [Baptiste Couvy-Duchesne] - `r format(Sys.time(), '%d %B %Y')`"
+output:
+  epuRate::ISGW:
+    toc: TRUE
+    code_folding: "show"
+---
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+
+# You need these libraries to run this template:
+library(rmarkdown)    # install.packages("rmarkdown") 
+library(epuRate)      # devtools::install_github("holtzy/epuRate", force=TRUE)
+
+# Soft-wrap code in knitting
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+#rmarkdown::render_site()
+```
+
+    
+# Likelihood function - coin flip  
+        
+Evolution of the likelihood function as we go from 1 to 100 coin flips
+        
+```{R, echo=T, eval=F}
+    
+# Simulate 10 coin flips - with 0.5 probability of heads
+set.seed(12345)
+cn=rbinom(n = 100, size = 1, prob = 0.5 )
+
+# Make 100 plots of the likelihood, each time adding 1 data point
+for (iii in 1:length(cn)){
+    nheads=sum(cn[1:iii])
+    png(filename = paste0("LK_coinToss_", sprintf("%03d", iii), ".png"),  width = 10, height = 8,  units = "cm", res = 300 )
+  par(mar=c(4,4,3,1))
+    curve( (x**nheads)*((1-x)**(iii-nheads)), xlab = "Theta", ylab="Likelihood")
+dev.off()
+}
+   
+# Combine all plots into a GIF
+library(magick)
+imgs <- list.files(path = "./", pattern = "LK_coinToss_",full.names = TRUE)
+img_list <- lapply(imgs, image_read)
+## join the images together
+img_joined <- image_join(img_list)
+## animate at 5 frames per second
+img_animated <- image_animate(img_joined, fps = 5, loop = 0)
+## save to disk
+image_write(image = img_animated,
+            path = "LK_coinToss.gif" )
+
+```
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold",out.width="80%"}
+
+library(knitr)
+include_graphics(path = "../Plots_Gifs/LK_coinToss.gif")
+
+```
+
+# Maximum likelihood estimates
+
+```{R, echo=T, eval=F}
+
+# Plots showing ML estimate for each iteration
+set.seed(12345)
+cn=rbinom(n = 100, size = 1, prob = 0.5 )
+resC=NULL
+for (iii in 1:length(cn)){
+    nheads=sum(cn[1:iii])
+    png(filename = paste0("LK_coinToss_MLE_", sprintf("%03d", iii), ".png"),  width = 12, height = 8,  units = "cm", res = 300 )
+  par(mar=c(2,4,2,1))
+  xx=runif(100, 0, 1)
+  yy=(xx**nheads)*((1-xx)**(iii-nheads))
+resC=c(resC, xx[which(yy==max(yy))])
+plot(1:length(cn), c(resC,rep(NA, length(cn)-iii)), ylab="ML estimate", pch=20, ylim=c(0,1) )
+lines(1:length(cn), c(resC,rep(NA, length(cn)-iii)) )
+abline(h=0.5)
+dev.off()
+}
+   
+# Make gif
+library(magick)
+imgs <- list.files(path = "./", pattern = "LK_coinToss_MLE_",full.names = TRUE)
+img_list <- lapply(imgs, image_read)
+## join the images together
+img_joined <- image_join(img_list)
+## animate at 2 frames per second
+img_animated <- image_animate(img_joined, fps = 5, loop = 0)
+## save to disk
+image_write(image = img_animated,
+            path = "LK_coinToss_MLE.gif" )
+
+
+```
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold",out.width="80%"}
+
+library(knitr)
+include_graphics(path = "../Plots_Gifs/LK_coinToss_MLE.gif")
+
+```
+
+# Likelihood plot - linear regression 
+        
+```{R, echo=TRUE, eval=F}
+    
+# We simulate X and Y for linear model
+set.seed(12345)
+Y=rnorm(100, mean = 0, sd = 1)
+X=scale(0.2*Y+rnorm(100, mean = 0, sd = 0.2))
+
+# Some checks
+plot(Y, X)
+cor(Y,X)
+
+# Fitting the regression
+lm(Y[1:30]~X[1:30])
+var(residuals(lm(Y[1:30]~X[1:30])))
+var(Y[1:30])-(cor(Y[1:30],X[1:30])**2)*var(X[1:30])
+# Storing the "true" (simulated) values of the parameters
+TRUEVAL=c(0.6455, 0.5132638)
+
+```
+
+## Write likelihood functions
+
+```{R, echo=TRUE, eval=F}
+# We create the likelihood functions f1 - f30 progressively adding rows of the data
+# I have not found a way to simplify the notation or loop it, I would love to hear if you find a better way.
+f1 <- function(x, y) (2*pi*y)**(-1/2) *exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 ) )
+f2 <- function(x, y) (2*pi*y)**(-2/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2) )
+f3 <- function(x, y) (2*pi*y)**(-3/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2) )
+f4 <- function(x, y) (2*pi*y)**(-4/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2) )
+
+# Etc
+f5 <- function(x, y) (2*pi*y)**(-5/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2) )
+f6 <- function(x, y) (2*pi*y)**(-6/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2) )
+
+f7 <- function(x, y) (2*pi*y)**(-7/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2) )
+f8 <- function(x, y) (2*pi*y)**(-8/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2) )
+f9 <- function(x, y) (2*pi*y)**(-9/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2) )
+f10 <- function(x, y) (2*pi*y)**(-10/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2) )
+
+f11 <- function(x, y) (2*pi*y)**(-11/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2) )
+f12 <- function(x, y) (2*pi*y)**(-12/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2) )
+f13 <- function(x, y) (2*pi*y)**(-13/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2) )
+f14 <- function(x, y) (2*pi*y)**(-14/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2) )
+f15 <- function(x, y) (2*pi*y)**(-15/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2) )
+f16 <- function(x, y) (2*pi*y)**(-16/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2) )
+f17 <- function(x, y) (2*pi*y)**(-17/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2) )
+f18 <- function(x, y) (2*pi*y)**(-18/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2) )
+
+f19 <- function(x, y) (2*pi*y)**(-19/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2) )
+
+f20 <- function(x, y) (2*pi*y)**(-20/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2) )
+
+f21 <- function(x, y) (2*pi*y)**(-21/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2) )
+
+f22 <- function(x, y) (2*pi*y)**(-22/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2) )
+
+f23 <- function(x, y) (2*pi*y)**(-23/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2) )
+
+f24 <- function(x, y) (2*pi*y)**(-24/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2) )
+
+f25 <- function(x, y) (2*pi*y)**(-25/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2 + (Y[25]-X[25]*x)**2) )
+
+f26 <- function(x, y) (2*pi*y)**(-26/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2 + (Y[25]-X[25]*x)**2 + (Y[26]-X[26]*x)**2) )
+
+f27 <- function(x, y) (2*pi*y)**(-27/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2 + (Y[25]-X[25]*x)**2 + (Y[26]-X[26]*x)**2 + (Y[27]-X[27]*x)**2) )
+
+f28 <- function(x, y) (2*pi*y)**(-28/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2 + (Y[25]-X[25]*x)**2 + (Y[26]-X[26]*x)**2 + (Y[27]-X[27]*x)**2 + (Y[28]-X[28]*x)**2) )
+
+f29 <- function(x, y) (2*pi*y)**(-29/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2 + (Y[25]-X[25]*x)**2 + (Y[26]-X[26]*x)**2 + (Y[27]-X[27]*x)**2 + (Y[28]-X[28]*x)**2 + (Y[29]-X[29]*x)**2) )
+
+f30 <- function(x, y) (2*pi*y)**(-30/2)*exp(-1/(2*y)*( (Y[1]-X[1]*x)**2 + (Y[2]-X[2]*x)**2 + (Y[3]-X[3]*x)**2 + (Y[4]-X[4]*x)**2 + (Y[5]-X[5]*x)**2 + (Y[6]-X[6]*x)**2 + (Y[7]-X[7]*x)**2 + (Y[8]-X[8]*x)**2 + (Y[9]-X[9]*x)**2+ (Y[10]-X[10]*x)**2 + (Y[11]-X[11]*x)**2+ (Y[12]-X[12]*x)**2 + (Y[13]-X[13]*x)**2 + (Y[14]-X[14]*x)**2 + (Y[15]-X[15]*x)**2 + (Y[16]-X[16]*x)**2 + (Y[17]-X[17]*x)**2 + (Y[18]-X[18]*x)**2  + (Y[19]-X[19]*x)**2 + (Y[20]-X[20]*x)**2 + (Y[21]-X[21]*x)**2 + (Y[22]-X[22]*x)**2 + (Y[23]-X[23]*x)**2 + (Y[24]-X[24]*x)**2 + (Y[25]-X[25]*x)**2 + (Y[26]-X[26]*x)**2 + (Y[27]-X[27]*x)**2 + (Y[28]-X[28]*x)**2 + (Y[29]-X[29]*x)**2 + (Y[30]-X[30]*x)**2) )
+
+```
+
+## Make 3d plot and export snapshots
+
+```{R, echo=TRUE, eval=F}
+   
+# Making 3d plot with snapshots
+library(rgl)
+res=curve_3d <- function(ff, x_range=c(-3, 3), y_range=c(0, 3), iii){ 
+       #if (!require(rgl) ) {stop("load rgl")}
+       xvec <- seq(x_range[1], x_range[2], len=100)
+        yvec <- seq(y_range[1], y_range[2], len=100)
+       fz <- outer(xvec, yvec, FUN=ff)
+       rbPal <- colorRampPalette(c('red','yellow'))
+       Col <- rbPal(10)[as.numeric(cut(fz,breaks = 10))]
+       open3d()
+       par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=0.8)
+       persp3d( xvec, yvec, fz, col=Col )
+       #view3d(theta = -45)
+       view3d(userMatrix = um, zoom = 0.8)
+       rgl.snapshot(paste0( "Likelihood_lm_", sprintf("%03d", iii), ".png"))
+        rgl.close()
+       }
+
+
+# Make plots for each iteration 
+curve_3d(ff = f1, iii = iii)
+iii=iii+1
+curve_3d(ff = f2, iii = iii)
+iii=iii+1
+curve_3d(ff = f3, iii = iii)
+iii=iii+1
+curve_3d(ff = f4, iii = iii)
+iii=iii+1
+curve_3d(ff = f5, iii = iii)
+iii=iii+1
+curve_3d(ff = f6, iii = iii)
+iii=iii+1
+curve_3d(ff = f7, iii = iii)
+iii=iii+1
+curve_3d(ff = f8, iii = iii)
+iii=iii+1
+curve_3d(ff = f9, iii = iii)
+iii=iii+1
+curve_3d(ff = f10, iii = iii)
+iii=iii+1
+curve_3d(ff = f11, iii = iii)
+iii=iii+1
+curve_3d(ff = f12, iii = iii)
+iii=iii+1
+curve_3d(ff = f13, iii = iii)
+iii=iii+1
+curve_3d(ff = f14, iii = iii)
+iii=iii+1
+curve_3d(ff = f15, iii = iii)
+iii=iii+1
+curve_3d(ff = f16, iii = iii)
+iii=iii+1
+curve_3d(ff = f17, iii = iii)
+iii=iii+1
+curve_3d(ff = f18, iii = iii)
+iii=iii+1
+curve_3d(ff = f19, iii = iii)
+iii=iii+1
+curve_3d(ff = f20, iii = iii)
+iii=iii+1
+curve_3d(ff = f21, iii = iii)
+iii=iii+1
+curve_3d(ff = f22, iii = iii)
+iii=iii+1
+curve_3d(ff = f23, iii = iii)
+iii=iii+1
+curve_3d(ff = f24, iii = iii)
+iii=iii+1
+curve_3d(ff = f25, iii = iii)
+iii=iii+1
+curve_3d(ff = f26, iii = iii)
+iii=iii+1
+curve_3d(ff = f27, iii = iii)
+iii=iii+1
+curve_3d(ff = f28, iii = iii)
+iii=iii+1
+curve_3d(ff = f29, iii = iii)
+iii=iii+1
+curve_3d(ff = f30, iii = iii)
+iii=iii+1
+
+```
+
+##  Combine images into a gif
+
+```{R, echo=TRUE, eval=F}
+   
+library(magick)
+imgs <- list.files(path = "./", pattern = "Likelihood_lm_",full.names = TRUE)
+img_list <- lapply(imgs, image_read)
+## join the images together
+img_joined <- image_join(img_list)
+## animate at 2 frames per second
+img_animated <- image_animate(img_joined, fps = 5, loop = 0)
+## save to disk
+image_write(image = img_animated,
+            path = "Likelihood_lm.gif" )
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="80%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/Likelihood_lm.gif"))
+
+```
+
+# Maximum likelihood estimators of linear model
+
+## Function to extract ML estimate
+
+```{R, echo=TRUE, eval=F}
+   
+# Plot maximum likelihood values as we increase the sample size
+res=c(0,0)
+# Function to extract ML estimates from model
+MLest <- function(ff, x_range=c(-3, 3), y_range=c(0, 3), iii, res){ 
+       #if (!require(rgl) ) {stop("load rgl")}
+      xvec <- seq(x_range[1], x_range[2], len=100)
+        yvec <- seq(y_range[1], y_range[2], len=100)
+       fz <- outer(xvec, yvec, FUN=ff)
+       fz[which(fz==max(fz, na.rm = T), arr.ind = T)]
+MLP=which(fz==max(fz, na.rm = T), arr.ind = T)
+MLEx=xvec[MLP[1]]
+MLEy=yvec[MLP[2]]
+res=rbind( res, c(MLEx,  MLEy))
+return(res)
+       }
+
+```
+
+## Get values from all likelihood functions
+
+```{R, echo=T, hide=T, fold=T, eval=F}
+  
+# Get all values for all iteration steps
+iii =1
+res=MLest(ff = f1, iii = iii, res=c(0,0))
+iii=iii+1
+res=MLest(ff = f2, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f3, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f4, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f5, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f6, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f7, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f8, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f9, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f10, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f11, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f12, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f13, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f14, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f15, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f16, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f17, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f18, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f19, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f20, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f21, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f22, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f23, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f24, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f25, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f26, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f27, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f28, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f29, iii = iii, res=res)
+iii=iii+1
+res=MLest(ff = f30, iii = iii, res=res)
+iii=iii+1
+res=res[-1,]
+resPlot=res
+
+```
+
+## Make plots and gif
+
+```{R, echo=T,  eval=F}
+
+# Make plots, adding a new row of data, every time
+for (iii in c(30:1)){
+    resPlot[iii,]=c(NA,NA)
+png(paste0("MLE_linearModel_full_", sprintf("%03d", iii),".png"), width = 20, height = 12, units = "cm", res=400)
+par(mfrow=c(2,1), mar=c(2,4,2,1))  
+plot(c(1:30), resPlot[,1], ylab="ML estimate", ylim=c(-1,2))
+lines(c(1:30), resPlot[,1])
+abline(h=TRUEVAL[1], lwd=3)
+
+plot(c(1:30), resPlot[,2],  ylab="ML estimate", ylim=c(0,1))
+lines(c(1:30), resPlot[,2])
+abline(h=TRUEVAL[2], lwd=3)
+dev.off()
+}
+
+# Combine images into a gif
+library(magick)
+imgs <- list.files(path = "./", pattern = "MLE_linearModel_full_",full.names = TRUE)
+img_list <- lapply(imgs, image_read)
+## join the images together
+img_joined <- image_join(img_list)
+## animate at 2 frames per second
+img_animated <- image_animate(img_joined, fps = 5, loop = 0)
+## save to disk
+image_write(image = img_animated,
+            path = "MLE_linearModel_full.gif" )
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="80%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/MLE_linearModel_full.gif"))
+
+```
+
+
+
+<br><br>

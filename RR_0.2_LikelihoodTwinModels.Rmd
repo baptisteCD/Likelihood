@@ -1,0 +1,32 @@
+---
+title: "Likelihood"
+author: "by [Baptiste Couvy-Duchesne] - `r format(Sys.time(), '%d %B %Y')`"
+output:
+  epuRate::ISGW:
+    toc: TRUE
+    code_folding: "show"
+---
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood_1.gif")
+
+include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood2.gif")
+
+```
+
+# Likelihood of twin models
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 31, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 32, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 33, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 34, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 35, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 36, ".gif"))
+
+```
+

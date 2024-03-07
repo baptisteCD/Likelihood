@@ -1,0 +1,722 @@
+---
+title: "Make likelihood plots of ACE models"
+author: "[Baptiste Couvy-Duchesne](https://github.com/baptisteCD)"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+mail: "baptiste.couvyduchesne@gmail.com"
+github: "baptisteCD"
+output:
+  epuRate::ISGW:
+    toc: TRUE
+    number_sections: FALSE
+    code_folding: "show"
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# You need these libraries to run this template:
+library(rmarkdown)    # install.packages("rmarkdown") 
+library(epuRate)      # devtools::install_github("baptisteCD/epuRate", force=TRUE)
+
+# Soft-wrap code in knitting
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+   
+
+```
+
+<br><br><br><br>
+
+# Fit an ACE model - continuous
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+# ----------------------------------------------------------------------------------------------------------------------
+#  Script: 00_ACEvc.R  
+#  Author: Sarah Medland
+#    Date: 29 02 2020 
+#
+# Twin Univariate ACE model to estimate causes of variation across multiple groups
+# Matrix style model - Raw data - Continuous data
+# -------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+
+library(OpenMx)
+
+# ----------------------------------------------------------------------------------------------------------------------
+# PREPARE DATA
+
+# Load Data (simulated for the ISGW workshop)
+df <- read.table("../Plots_Gifs/twinsibData.txt", header=T)
+
+# Standardise the phenotype to have a variance of 1 - hence estimates of Va and Vc close to the heritability and shared environment contribution
+df$Twin1=scale(df$Twin1)
+df$Twin2=scale(df$Twin2)
+
+# Sample composition
+table(df$zygosity)
+
+```
+
+# Fit the ACE twin model with covariates
+
+```{r, message=FALSE, warning=FALSE, eval=T}
+
+# Select Variables for Analysis
+nv        <- 1                          # number of traits
+nt        <- 2                          # number of individuals
+ntv       <- nv*nt                      # number of total variables
+selVars   <- c('Twin1', 'Twin2')        # name of traits
+covVars   <- c('age1', 'age2', 'sex1', 'sex2') # list of covariates
+
+# Select Data for Analysis
+mzData    <- subset(df, zygosity==1, c(selVars,covVars))
+dzData    <- subset(df, zygosity==2, c(selVars,covVars))
+
+# Check Descriptives
+colMeans(mzData[,c(selVars,covVars)],na.rm=T)
+colMeans(dzData[,c(selVars,covVars)],na.rm=T)
+cov(mzData,use="pairwise.complete.obs")
+cov(dzData,use="pairwise.complete.obs")
+# Set Starting Values
+sMu      <- 0                        # start value for means
+sVa      <- .3                       # start value for A
+sVc      <- .3                       # start value for C
+sVe      <- .3                       # start value for E
+# ----------------------------------------------------------------------------------------------------------------------
+# PREPARE MODEL
+# Create Algebra for expected Mean Matrices
+intercept     <- mxMatrix( type="Full", nrow=1, ncol=ntv, free=TRUE, values=sMu, labels="interC", name="intercept" )
+betaS         <- mxMatrix( type="Full", nrow=1, ncol=nv, free=TRUE, values=0, labels="betaS", name="bS" )
+betaA         <- mxMatrix( type="Full", nrow=1, ncol=nv, free=TRUE, values=0, labels="betaA", name="bA" )
+defSex        <- mxMatrix( type="Full", nrow=1, ncol=nt, free=FALSE, labels=c("data.sex1","data.sex2"), name="Sex" )
+defAge        <- mxMatrix( type="Full", nrow=1, ncol=nt, free=FALSE, labels=c("data.age1","data.age2"), name="Age" )
+expMean       <- mxAlgebra( expression = intercept + Sex%x%bS + Age%x%bA , name="expMean" )
+# Create Matrices for Variance Components
+covA      <- mxMatrix( type="Symm", nrow=nv, ncol=nv, free=TRUE, values=sVa, label="VA11", name="VA" ) 
+covC      <- mxMatrix( type="Symm", nrow=nv, ncol=nv, free=TRUE, values=sVc, label="VC11", name="VC" )
+covE      <- mxMatrix( type="Symm", nrow=nv, ncol=nv, free=TRUE, values=sVe, label="VE11", name="VE" )
+# Create Algebra for expected Variance/Covariance Matrices in MZ & DZ twins
+covP      <- mxAlgebra( expression= VA+VC+VE, name="V" )
+covMZ     <- mxAlgebra( expression= VA+VC, name="cMZ" )
+covDZ     <- mxAlgebra( expression= 0.5%x%VA+ VC, name="cDZ" )
+expCovMZ  <- mxAlgebra( expression= rbind( cbind(V, cMZ),
+                                           cbind(t(cMZ), V)), name="expCovMZ" )
+expCovDZ  <- mxAlgebra( expression= rbind( cbind(V, cDZ),
+                                           cbind(t(cDZ), V)), name="expCovDZ" )
+# Create Data Objects for Multiple Groups
+dataMZ    <- mxData( observed=mzData, type="raw" )
+dataDZ    <- mxData( observed=dzData, type="raw" )
+# Create Expectation Objects for Multiple Groups
+expMZ     <- mxExpectationNormal( covariance="expCovMZ", means="expMean", dimnames=selVars )
+expDZ     <- mxExpectationNormal( covariance="expCovDZ", means="expMean", dimnames=selVars )
+funML     <- mxFitFunctionML()
+# Create Model Objects for Multiple Groups
+defs      <- list(defAge, defSex)
+pars      <- list( intercept, betaS, betaA, covA, covC, covE, covP )
+modelMZ   <- mxModel( defs, pars, expMean, covMZ, expCovMZ, dataMZ, expMZ, funML, name="MZ" )
+modelDZ   <- mxModel( defs, pars, expMean, covDZ, expCovDZ, dataDZ, expDZ, funML, name="DZ" )
+multi     <- mxFitFunctionMultigroup( c("MZ","DZ") )
+# Create Algebra for Variance Components
+rowVC     <- rep('VC',nv)
+colVC     <- rep(c('VA','VC','VE','SA','SC','SE'),each=nv)
+estVC     <- mxAlgebra( expression=cbind(VA,VC,VE,VA/V,VC/V,VE/V), name="VarC", dimnames=list(rowVC,colVC) )
+# Create Confidence Interval Objects
+ciACE     <- mxCI( "VarC[1,4:6]" )
+# Build Model with Confidence Intervals
+modelACE  <- mxModel( "ACEvc", modelMZ, modelDZ, multi, pars, estVC, ciACE )
+# ----------------------------------------------------------------------------------------------------------------------
+# RUN MODEL
+# Run ACE Model
+#mxOption(NULL,"Default optimizer","CSOLNP")
+mxOption(NULL,"Default optimizer","SLSQP") # Manually choose optimiser
+modelACE <- mxOption(modelACE, "Checkpoint Units", "iterations") # These options will extract the summary of the optimisation process - to be used in the chunk below where we show the optimisation path on the likelihood surface
+fitACE    <- mxRun( modelACE, intervals=T, checkpoint = T )
+sumACE    <- summary( fitACE )
+sumACE
+# Some different ways to extract output
+fitACE$output$estimate
+fitACE$VarC$result
+fitACE$output$confidenceIntervals
+
+
+# AE and CE
+fitAE=fitACE
+fitAE <- omxSetParameters(model = fitAE, labels="VC11", values=0, free = FALSE)
+fitAE=mxRun(fitAE)
+fitAE$output$estimate
+
+fitCE=fitACE
+fitCE <- omxSetParameters(model = fitCE, labels="VA11", values=0, free = FALSE)
+fitCE=mxRun(fitCE)
+fitCE$output$estimate
+
+# Test the A and C parameters
+1-pchisq(abs(fitACE$fitfunction$result[1]-fitAE$fitfunction$result[1]), 1)
+1-pchisq(abs(fitACE$fitfunction$result[1]-fitCE$fitfunction$result[1]), 1)
+
+
+```
+
+# Get likelihood surface
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+# Range of Va and Vc values at which we will calculate the likelihood value
+aval= seq(-0.05,1,0.05)
+aval2=  seq(-0.05,1,0.05)
+
+# We set Va and Vc and estimate the likelihood at each point
+res=NULL
+for (avali in aval){
+    for (avalj in aval2){
+        easyo=fitACE
+easyo <- omxSetParameters(model = easyo, labels="VA11", values=avali, free = FALSE)
+easyo <- omxSetParameters(model = easyo, labels="VC11", values=avalj, free = FALSE)
+easyoM=mxRun(easyo)
+res=rbind(res, c(avali, avalj, easyoM$fitfunction$result[1]))
+}}
+
+res=as.data.frame(res)
+res$col="black"
+res$size=2
+
+# Add Max likelihood to the surface
+res=rbind(res, c(fitACE$output$estimate[4], fitACE$output$estimate[5], fitACE$fitfunction$result[1],"red", 10) )
+
+# Format results
+library(rgl) # 3d plots
+res=as.data.frame(res)
+res$V1= as.numeric(res$V1)
+res$V2= as.numeric(res$V2)
+res$V3= as.numeric(res$V3)*(-1) # fmultiply by -1 as fitfunction from openMx is -2LL
+
+# Plot likelihood - check
+range(res$V3)
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=0.8, cex=2)
+rgl::plot3d(res[,1:3], col=res$col, radius=res$size)
+
+```
+
+# Some plot functions to make plotting better
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+# Axes and/or bottom surface
+rgl_add_axes <- function(x, y, z, axis.col = "black",
+                xlab = "", ylab="", zlab="", show.plane = FALSE, 
+                show.bbox = FALSE, bbox.col = c("#869599","black"))
+  { 
+  
+  lim <- function(x){c(min(x), max(abs(x))) * 1}
+  # Add axes
+  xlim <- lim(x); ylim <- lim(y); zlim <- lim(z)
+  rgl.lines(xlim, c(0, 0), c(0, 0), color = axis.col)
+  rgl.lines(c(0, 0), ylim, c(0, 0), color = axis.col)
+  rgl.lines(c(0, 0), c(0, 0), zlim, color = axis.col)
+  
+   # Add a point at the end of each axes to specify the direction
+   axes <- rbind(c(xlim[2]*1.05, 0, 0), c(0, ylim[2]*1.05, 0), 
+                 c(0, 0, zlim[2]*1.05))
+   rgl.points(axes, color = axis.col, size = 5)
+  
+  # Add axis labels
+  rgl.texts(axes, text = c(xlab, ylab, zlab), color = axis.col,
+             adj = c(0.5, -0.8), size = 20, cex = 2)
+  
+  # Add ticks
+  ticks=rbind(c(0,0,0), c(0.25,0,0) ,c(0.5,0,0) , c(0.75,0,0), c(1,0,0))
+    rgl.texts(ticks, text = c(0,0.25,0.5,0.75,1), color = axis.col,
+             adj = c(0.5, -0.8), size = 15)
+      ticks=rbind(c(0,0,0), c(0,0.25,0) ,c(0,0.5,0) , c(0,0.75,0), c(0,1,0))
+    rgl.texts(ticks, text = c(0,0.25,0.5,0.75,1), color = axis.col,
+             adj = c(0.5, -0.8), size = 15)
+  # Add plane
+ if(show.plane){ 
+   xlim <- xlim/1.1; zlim <- zlim /1.1
+   rgl.quads( x = c(xlim[1], xlim[2], xlim[2], xlim[1]), y = c(ylim[1], ylim[2], ylim[2], ylim[1]),      z = 0)
+  
+  # Add bounding box decoration
+   # Uncomment if want to add it
+  #if(show.bbox){
+  #  rgl.bbox(color=c(bbox.col[1],bbox.col[2]), alpha = 0.5, 
+  #        emission=bbox.col[1], specular=bbox.col[1], shininess=5, 
+  #        xlen = 0, ylen = 0, zlen = 0) 
+  }
+}
+
+# Highlight points by adding projections to the bottom plan 
+rgl_add_pointLines <- function(xML, yML, zML, col="black")
+  { 
+  # Add axes
+rgl.lines(c(xML,xML), c(0, 1), c(0, 0), color = col,  cex=4)
+rgl.lines(c(0,1), c(yML, yML), c(0, 0), color = col, cex=4)
+rgl.lines(xML, yML, c(0, zML), color = col, cex=4)
+}
+
+```
+
+# Plot the likelihood
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+# We do a bit of formatting
+res2=res
+res2$V3=scale(res2$V3)-min(res2$V3) # start likelihood at 0 - to improve plotting
+res2$V3=exp(scale(res2$V3)) # take the exponential as V3 is the log likelihood
+res2$V1=as.numeric(res2$V1)
+res2$V2=as.numeric(res2$V2)
+res2$size[which(res2$size==2)]=0.04 # Size of the points
+res2$size[which(res2$size==10)]=0.08 # size of the ML point
+# Replace to better colors
+res2$col[which(res2$col=="red")]="#d5c376"
+res2$col[which(res2$col=="black")]="#7d7b74"
+# We add a second color value which  is based on the likelihood value
+pal <- colorRamp(c("#555551","#555551","#555551", "#9c8c64", "#d2c699","#e3d088", "#eed67d", "#fadd71" ))    
+res2$col2 <- rgb(pal((res2$V3 - min(res2$V3)) / diff(range(res2$V3))), max=255)  # 2) interpolate numbers
+
+# Plot the surface
+par3d(windowRect = c(0.5, 0.5, 800, 800)*1.5, zoom=1)
+rgl::spheres3d(res2[,1:3], col=res2$col2, radius=res2$size)
+rgl_add_axes(as.numeric(res2$V1), as.numeric(res2$V2), res2$V3, show.bbox = TRUE, show.plane = TRUE, xlab = "A", ylab="C", zlab="Likelihood")
+rgl.quads( x = c(0, 0, 1, 1), y = c(0, 1, 1, 0),      z = -0.1, col=rgb(250,255,227, maxColorValue = 255, alpha = 0.05))
+aspect3d(1,1,1 )
+
+# Export screenshot for gif
+nbImagesForGif=72
+outputPath="./"
+movie3d( spin3d(rpm=10), duration = 6, fps = nbImagesForGif/6 , frames = paste0("Likelihood_", "ACE1_GIF_"), dir = "./",  convert=NULL, clean=F, movie = paste0(outputPath, "/BWAS_", bwasFile,"_", hemi, "_", moda , "ACE1_GIF") )
+rgl.close()
+
+# Make gif
+print("Making GIF")
+library(magick)
+imgs <- list.files(path = "./" , pattern = paste0("Likelihood_", "ACE1_GIF_"),  full.names = T )
+imgs<-c(imgs[1:length(imgs)])
+img_list <- lapply(imgs, image_read)
+## join the images together
+img_joined <- image_join(img_list)
+## animate at 20 frames per second
+img_animated <- image_animate(img_joined, fps = 10)
+## save to disk
+image_write(image = img_animated, path = paste0("Likelihood_", "_ACE1_GIF_" ,".gif"))
+
+# Save the surface to avoid having to refit all the openMx models next time
+write.table(res, "res_Likelihood_ACE.txt", col.names = T, row.names = F)
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="100%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/Likelihood_", "_ACE1_GIF_" ,".gif"))
+
+```
+
+# Interpolate likelihood surface
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+res=read.table("res_Likelihood_ACE.txt", header=T)
+
+# Interpolation using the akima package
+library(akima)
+n_interpolation <- 200
+spline_interpolated <- interp(res$V1, res$V2, res$V3,
+                              xo=seq(min(res$V1), max(res$V1), length = n_interpolation),
+                              yo=seq(min(res$V2), max(res$V2), length = n_interpolation),
+                              linear = FALSE, extrap = TRUE)
+
+x.si <- spline_interpolated$x
+y.si <- spline_interpolated$y
+z.si <- spline_interpolated$z
+range(z.si)
+
+# Format the interpolated values in a table
+res3=NULL
+for (iii in 1:n_interpolation){
+    for (jjj in 1:n_interpolation){
+        res3=rbind(res3, c(x.si[iii], y.si[jjj], z.si[iii,jjj]))
+    }
+}
+res3=as.data.frame(res3)
+res3$col="black"
+res3$size=2
+
+# Add Max likelihood
+range(res3$V3)
+res3=rbind(res3, c(fitACE$output$estimate[4], fitACE$output$estimate[5], fitACE$fitfunction$result[1]*(-1),"red", 10) )
+
+# More formatting 
+res3$V3=as.numeric(res3$V3) * (-1)
+res3$V3=as.numeric(res3$V3) * (-1)
+res3$size[which(res3$size==10)]=100
+
+# Quick check
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=0.8)
+rgl::plot3d(res3[,1:3])
+
+# Save interpolated surface
+write.table(res3, "res_Likelihood_ACE_interp.txt", col.names = T, row.names = F)
+
+
+```
+
+# Plot the interpolated surface
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+res3=read.table("res_Likelihood_ACE_interp.txt", header = T)
+
+library(rgl)
+
+# See first plot for details - same options
+res32=res3
+res32$V3=scale(res32$V3)-min(res32$V3)
+res32$V3=exp(scale(res32$V3))
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$size[which(res32$size==2)]=0.04
+res32$size[which(res32$size==100)]=0.08
+res32$col[which(res32$col=="red")]="#d5c376"
+res32$col[which(res32$col=="black")]="#7d7b74"
+pal <- colorRamp(c("#555551", "#9c8c64", "#d2c699" ))    # 1) choose colors
+res32$col2 <- rgb(pal((res32$V3 - min(res32$V3)) / diff(range(res32$V3))), max=255)  # 2) interpolate numbers
+
+# 3D Plot
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=1)
+rgl::spheres3d(res32[,1:3], col=res32$col2, radius=res32$size)
+rgl_add_axes(as.numeric(res32$V1), as.numeric(res32$V2), res32$V3, show.bbox = FALSE, show.plane = FALSE, xlab = "A", ylab="C", zlab="Likelihood")
+rgl.quads( x = c(0, 0, 1, 1), y = c(0, 1, 1, 0),      z = -0.1, col=rgb(250,255,227, maxColorValue = 255, alpha = 0.05))
+rgl_add_pointLines(xML=res32[which(res32$size==0.08),1], yML=res32[which(res32$size==0.08),2], zML=res32[which(res32$size==0.08),3], col="#edbd08")
+aspect3d(1,1,1 )
+
+# Export screenshot for gif
+nbImagesForGif=72
+outputPath="./"
+movie3d( spin3d(rpm=10), duration = 6, fps = nbImagesForGif/6 , frames = paste0("Likelihood_", "ACE2_GIF_"), dir = "./",  convert=NULL, clean=F, movie = paste0(outputPath, "/BWAS_", bwasFile,"_", hemi, "_", moda , "ACE2_GIF") )
+rgl.close()
+
+# Make gif
+print("Making GIF")
+library(magick)
+imgs <- list.files(path = outputPath , pattern = paste0("Likelihood_", "ACE2_GIF_"),  full.names = T )
+imgs<-c(imgs[1:length(imgs)])
+img_list <- lapply(imgs, image_read)
+img_joined <- image_join(img_list)
+img_animated <- image_animate(img_joined, fps = 10)
+image_write(image = img_animated, path = paste0("Likelihood_", "_ACE2_GIF_" ,".gif"))
+
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="100%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/Likelihood_", "_ACE2_GIF_" ,".gif"))
+
+```
+
+# Visualise Likelihood ratio test
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+# We start again from the base surface
+res=read.table("res_Likelihood_ACE.txt", header=T)
+
+# Re-run interpolation
+library(akima)
+n_interpolation <- 200
+spline_interpolated <- interp(res$V1, res$V2, res$V3,
+                              xo=seq(min(res$V1), max(res$V1), length = n_interpolation),
+                              yo=seq(min(res$V2), max(res$V2), length = n_interpolation),
+                              linear = FALSE, extrap = TRUE)
+x.si <- spline_interpolated$x
+y.si <- spline_interpolated$y
+z.si <- spline_interpolated$z
+
+# Format into a table
+res3=NULL
+for (iii in 1:n_interpolation){
+    for (jjj in 1:n_interpolation){
+        res3=rbind(res3, c(x.si[iii], y.si[jjj], z.si[iii,jjj]))
+    }
+}
+res3=as.data.frame(res3)
+res3$col="black"
+res3$size=2
+
+# Add Max likelihood of ACE, AE and CE
+# Re-run first 2 chunks if the models are not in your environment
+res3=rbind(res3, c(fitACE$output$estimate[4], fitACE$output$estimate[5], fitACE$fitfunction$result[1]*(-1),"red", 10) )
+res3=rbind(res3, c(fitAE$output$estimate[4], 0, fitAE$fitfunction$result[1]*(-1),"pink", 10) )
+res3=rbind(res3, c(0, fitCE$output$estimate[4], fitCE$fitfunction$result[1]*(-1),"pink", 10) )
+
+# Format for plotting
+res3$V3=as.numeric(res3$V3) * (-1)
+res3$V3=as.numeric(res3$V3) * (-1)
+res3$size[which(res3$size==10)]=100
+
+# Plot to check
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=0.8)
+rgl::plot3d(res3[,1:3])
+
+
+library(rgl)
+# Formatting for plotting (see first 3d plot)
+res32=res3
+res32$V3=scale(res32$V3)-min(res32$V3)
+res32$V3=exp(scale(res32$V3))
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$size[which(res32$size==2)]=0.04
+res32$size[which(res32$size==100)]=0.08
+res32$col[which(res32$col=="black")]="#7d7b74"
+pal <- colorRamp(c("#555551", "#9c8c64", "#d2c699" ))    # 1) choose colors
+res32$col2 <- rgb(pal((res32$V3 - min(res32$V3)) / diff(range(res32$V3))), max=255)  # 2) interpolate numbers
+
+res32$col2[which(res32$col=="red")]="#d57688" # Color of the maximum likelihood
+res32$col2[which(res32$col=="pink")]=c("#c376d5", "#7688d5") # colors of AE and CE
+
+# We add the projected points of the likelihood values on the z axis (x and y =0, z=likelihood values)
+res32=rbind(res32, c(0,0,as.numeric(res32$V3[which(res32$col=="pink")][1]), "pink", 0.08, "#c376d5"))
+res32=rbind(res32, c(0,0,as.numeric(res32$V3[which(res32$col=="pink")][2]), "pink", 0.08, "#7688d5"))
+res32=rbind(res32, c(0,0,as.numeric(res32$V3[which(res32$col=="red")]), "pink", 0.08, "#d57688"))
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$V3=as.numeric(res32$V3)
+
+# 3D plot
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=1)
+rgl::spheres3d(res32[,1:3], col=res32$col2, radius=res32$size)
+rgl_add_axes(as.numeric(res32$V1), as.numeric(res32$V2), res32$V3, show.bbox = FALSE, show.plane = FALSE, xlab = "A", ylab="C", zlab="Likelihood")
+rgl.quads( x = c(0, 0, 1, 1), y = c(0, 1, 1, 0),      z = -0.1, col=rgb(250,255,227, maxColorValue = 255, alpha = 0.05))
+
+# Add the lines between points and their projected points on the z axis
+rgl.lines(c(0,as.numeric(res32$V1[which(res32$col=="pink")][1])), c(0, as.numeric(res32$V2[which(res32$col=="pink")][1])), c(as.numeric(res32$V3[which(res32$col=="pink")][1]), as.numeric(res32$V3[which(res32$col=="pink")][1])), color = "#c376d5",  cex=4)
+
+rgl.lines(c(0,as.numeric(res32$V1[which(res32$col=="pink")][2])), c(0, as.numeric(res32$V2[which(res32$col=="pink")][2])), c(as.numeric(res32$V3[which(res32$col=="pink")][2]), as.numeric(res32$V3[which(res32$col=="pink")][2])), color = "#7688d5",  cex=4)
+
+rgl.lines(c(0,as.numeric(res32$V1[which(res32$col=="red")][1])), c(0, as.numeric(res32$V2[which(res32$col=="red")][1])), c(as.numeric(res32$V3[which(res32$col=="red")][1]), as.numeric(res32$V3[which(res32$col=="red")][1])), color = "#d57688",  cex=4)
+
+aspect3d(1,1,1 )
+
+# Export screenshots for gif
+nbImagesForGif=72
+outputPath="./"
+movie3d( spin3d(rpm=10), duration = 6, fps = nbImagesForGif/6 , frames = paste0("Likelihood_", "ACE3_GIF_"), dir = "./",  convert=NULL, clean=F, movie = paste0(outputPath, "/BWAS_", bwasFile,"_", hemi, "_", moda , "ACE3_GIF") )
+rgl.close()
+
+# Make gif
+print("Making GIF")
+library(magick)
+imgs <- list.files(path = outputPath , pattern = paste0("Likelihood_", "ACE3_GIF_"),  full.names = T )
+imgs<-c(imgs[1:length(imgs)])
+img_list <- lapply(imgs, image_read)
+img_joined <- image_join(img_list)
+img_animated <- image_animate(img_joined, fps = 10)
+image_write(image = img_animated, path = paste0("Likelihood_", "_ACE3_GIF_" ,".gif"))
+
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="100%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/Likelihood_", "_ACE3_GIF_" ,".gif"))
+
+```
+
+# Showing optimisation paths - SLSQP
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+# Add optimization path
+aa=read.table("ACEvc_SLSQP.omx", sep="\t", header=T) # See first chunks (Twin model) where the .omx summary of optmisation is generated - it may be called by default ACEvc.omx
+
+# You want to check this if using a different model
+aa=aa[1:18,] # We extract the rows that correspond to the ACE estimation 
+
+# Get the likelihood values for each point of the optimization path
+for (iii in 1:length(aa$iterations) ){
+        easyo=fitACE
+easyo <- omxSetParameters(model = easyo, labels="VA11", values=aa$VA11[iii], free = FALSE)
+easyo <- omxSetParameters(model = easyo, labels="VC11", values=aa$VC11[iii], free = FALSE)
+easyoM=mxRun(easyo)
+ res3=rbind(res3, c(aa$VA11[iii], aa$VC11[iii], easyoM$fitfunction$result[1]*(-1), "blue", 10))
+}
+
+# Formatting again
+res3$V3=as.numeric(res3$V3) * (-1)
+res3$V3=as.numeric(res3$V3) * (-1)
+
+library(rgl)
+# Formattting for plotting
+res32=res3
+res32$V3=scale(res32$V3)-min(res32$V3)
+res32$V3=exp(scale(res32$V3))
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$size[which(res32$size==2)]=0.03
+res32$size[which(res32$size==100)]=0.04
+table(res32$size)
+res32$col[which(res32$col=="black")]="#7d7b74"
+res32=res32[-which(res32$col=="pink"),]
+pal <- colorRamp(c("#555551", "#9c8c64", "#d2c699" ), alpha = T)    # 1) choose colors
+res32$col2 <- rgb(pal((res32$V3 - min(res32$V3)) / diff(range(res32$V3))), max=255)  # 2) interpolate numbers
+# Purple palette for optimization points
+pal2 <- colorRamp(c("#663cc3", "#764fc9", "#8562cf", "#9476d5", "#a38adb", "#b29de1", "#c2b1e7" ))    
+res32$col2[which(res32$col=="blue")] <- rgb(pal2((res32$V3[which(res32$col=="blue")] - min(res32$V3[which(res32$col=="blue")])) / diff(range(res32$V3[which(res32$col=="blue")]))), max=255)  
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$V3=as.numeric(res32$V3)
+
+# 3D plot
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=1)
+rgl::spheres3d(res32[,1:3], col=res32$col2, radius=res32$size , alpha=ifelse(res32$size==0.04, 1, 0.1))
+rgl_add_axes(as.numeric(res32$V1), as.numeric(res32$V2), res32$V3, show.bbox = FALSE, show.plane = FALSE, xlab = "A", ylab="C", zlab="Likelihood")
+rgl.quads( x = c(0, 0, 1, 1), y = c(0, 1, 1, 0),      z = -0.1, col=rgb(250,255,227, maxColorValue = 255, alpha = 0.05))
+
+# Add lines between each point of the optimisation process
+for (iii in 1:17){
+    # find starting points
+    sp=res32[which(res32$V1==aa$VA11[iii] & res32$V2==aa$VC11[iii]),]
+    # find ending point
+    jjj=iii+1
+    ep=res32[which(res32$V1==aa$VA11[(jjj)] & res32$V2==aa$VC11[(jjj)]),]
+rgl.lines(c(sp$V1,ep$V1), c(sp$V2,ep$V2), c(sp$V3,ep$V3), color = sp$col2, lwd=4, cex=4)
+}
+aspect3d(1,1,1 )
+
+# Export screenshot for gif
+nbImagesForGif=72
+outputPath="./"
+movie3d( spin3d(rpm=10), duration = 6, fps = nbImagesForGif/6 , frames = paste0("Likelihood_", "ACE5_GIF_"), dir = "./",  convert=NULL, clean=F, movie = paste0(outputPath, "/BWAS_", bwasFile,"_", hemi, "_", moda , "ACE5_GIF") )
+rgl.close()
+
+# Make gif
+print("Making GIF")
+library(magick)
+imgs <- list.files(path = outputPath , pattern = paste0("Likelihood_", "ACE5_GIF_"),  full.names = T )
+imgs<-c(imgs[1:length(imgs)])
+img_list <- lapply(imgs, image_read)
+img_joined <- image_join(img_list)
+img_animated <- image_animate(img_joined, fps = 10)
+image_write(image = img_animated, path = paste0("Likelihood_", "_ACE5_GIF_" ,".gif"))
+
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="100%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/Likelihood_", "_ACE5_GIF_" ,".gif"))
+
+```
+
+# Confidence intervals
+
+```{r, message=FALSE, warning=FALSE, eval=F}
+
+# We can get the estimated CIs from the omx file (but could also find them in the fitted ACE model)
+aa=read.table("ACEvc_SLSQP.omx", sep="\t", header=T)
+aa=aa[grep(aa$OpenMxContext, pattern = "MxComputeGradientDescent"),]
+aa=aa[19:22,] # Extract the rows of interest
+
+fitACE$output$confidenceIntervals # same information - but in less convenient format 
+res3=res3[which(!res3$col=="orange"),]
+
+# Get the likelihood at the CI lower and upper bounds
+for (iii in 1:4){
+        easyo=fitACE
+easyo <- omxSetParameters(model = easyo, labels="VA11", values=aa$VA11[iii], free = FALSE)
+easyo <- omxSetParameters(model = easyo, labels="VC11", values=aa$VC11[iii], free = FALSE)
+easyoM=mxRun(easyo)
+print(easyoM$fitfunction$result[1]*(-1))
+res3=rbind(res3, c(aa$VA11[iii], aa$VC11[iii], easyoM$fitfunction$result[1]*(-1), "orange", 10))
+}
+# Note that the likelihood is the same for all these points - it corresponds to the degraded likelihood
+ 
+# Format - one last time
+res3$V3=as.numeric(res3$V3) * (-1)
+res3$V3=as.numeric(res3$V3) * (-1)
+
+library(rgl)
+# Prepare for plotting
+res32=res3
+res32$V3=scale(res32$V3)-min(res32$V3)
+res32$V3=exp(scale(res32$V3))
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$size[which(res32$size==2)]=0.02
+res32$size[which(res32$size==100)]=0.02
+res32$size[which(res32$size==10)]=0.02
+table(res32$size)
+#res32$col[which(res32$col=="red")]="#d5c376"
+res32$col[which(res32$col=="black")]="#7d7b74"
+res32=res32[-which(res32$col=="pink"),]
+res32=res32[-which(res32$col=="blue"),]
+res4=res32[which(res32$col=="orange"),]
+#res32=res32[-which(res32$col=="orange"),]
+pal <- colorRamp(c("#555551", "#9c8c64", "#d2c699" ), alpha = T)    # 1) choose colors
+res32$col2 <- rgb(pal((res32$V3 - min(res32$V3)) / diff(range(res32$V3))), max=255)  # 2) interpolate numbers
+
+# We highlights the points of the surface that intersect the likelihood surface
+res32$col2[which(res32$V3>3.007 & res32$V3<3.014 )]="gold"
+table(res32$col2)
+res5=res32[which(res32$V3>3.007 & res32$V3<3.014 ),]
+res5$V3=0
+res5$col2="gold"
+res32=rbind(res32, res5)
+
+res32$V1=as.numeric(res32$V1)
+res32$V2=as.numeric(res32$V2)
+res32$V3=as.numeric(res32$V3)
+
+# 3d plot
+par3d(windowRect = c(0, 0, 800, 800)*1.5, zoom=1)
+rgl::spheres3d(res32[,1:3], col=res32$col2, radius=res32$size , alpha=ifelse(res32$size==0.04, 1, 0.5))
+rgl_add_axes(as.numeric(res32$V1), as.numeric(res32$V2), res32$V3, show.bbox = FALSE, show.plane = FALSE, xlab = "A", ylab="C", zlab="Likelihood")
+rgl.quads( x = c(0, 0, 1, 1), y = c(0, 1, 1, 0),      z = -0.1, col=rgb(250,255,227, maxColorValue = 255, alpha = 0.05))
+res4=as.data.frame(res4)
+
+# Add degraded lieklihood surface
+rgl.quads( x = c(0, 0, 1, 1), y = c(0, 1, 1, 0),      z =3.02, col="gold")
+
+# Add lines 
+res5=res32[which(res32$V3>3.007 & res32$V3<3.014 ),]
+minA=res5[which(res5$V1==min(res5$V1)),]
+minA=minA[which(minA$V2==min(minA$V2)),]
+maxA=res5[which(res5$V1==max(res5$V1)),]
+maxA=maxA[which(maxA$V2==min(maxA$V2)),]
+
+rgl.lines(c(minA$V1[1],minA$V1[1]), c(minA$V2[1],minA$V2[1]), c(0,minA$V3[1]), color = "gold", lwd=2, cex=4)
+rgl.lines(c(minA$V1[1],0), c(minA$V2[1],minA$V2[1]), c(0,0), color = "gold", lwd=2, cex=4)
+rgl.lines(c(minA$V1[1],minA$V1[1]), c(minA$V2[1],0), c(0,0), color = "gold", lwd=2, cex=4)
+
+rgl.lines(c(maxA$V1[1],maxA$V1[1]), c(maxA$V2[1],maxA$V2[1]), c(0,maxA$V3[1]), color = "gold", lwd=2, cex=4)
+rgl.lines(c(maxA$V1[1],0), c(maxA$V2[1],maxA$V2[1]), c(0,0), color = "gold", lwd=2, cex=2)
+rgl.lines(c(maxA$V1[1],maxA$V1[1]), c(maxA$V2[1],0), c(0,0), color = "gold", lwd=2, cex=2)
+
+aspect3d(1,1,1 )
+
+# Export screenshots for gif
+nbImagesForGif=72
+outputPath="./"
+movie3d( spin3d(rpm=10), duration = 6, fps = nbImagesForGif/6 , frames = paste0("Likelihood_", "ACE6_GIF_"), dir = "./",  convert=NULL, clean=F, movie = paste0(outputPath, "/BWAS_", bwasFile,"_", hemi, "_", moda , "ACE6_GIF") )
+rgl.close()
+
+# Make gif
+print("Making GIF")
+library(magick)
+imgs <- list.files(path = outputPath , pattern = paste0("Likelihood_", "ACE6_GIF_"),  full.names = T )
+imgs<-c(imgs[1:length(imgs)])
+img_list <- lapply(imgs, image_read)
+img_joined <- image_join(img_list)
+img_animated <- image_animate(img_joined, fps = 10)
+image_write(image = img_animated, path = paste0("Likelihood_", "_ACE6_GIF_" ,".gif"))
+
+
+```
+
+```{R, echo=F , message=FALSE, hide=T,fig.show="hold",out.width="100%"}
+
+library(knitr)
+include_graphics(path = paste0("../Plots_Gifs/Likelihood_", "_ACE6_GIF_" ,".gif"))
+
+```

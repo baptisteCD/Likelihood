@@ -1,0 +1,41 @@
+---
+title: "Likelihood"
+author: "by [Baptiste Couvy-Duchesne] - `r format(Sys.time(), '%d %B %Y')`"
+output:
+  epuRate::ISGW:
+    toc: TRUE
+    code_folding: "show"
+---
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood_1.gif")
+
+include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood2.gif")
+
+```
+
+
+# A simple example
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 39, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 40, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 41, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 42, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 43, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 44, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 45, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 46, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 47, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 48, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 49, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 50, ".gif"))
+
+```
+
+
+

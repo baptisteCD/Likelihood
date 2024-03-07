@@ -1,0 +1,81 @@
+---
+title: "Likelihood"
+author: "by [Baptiste Couvy-Duchesne] - `r format(Sys.time(), '%d %B %Y')`"
+output:
+  epuRate::ISGW:
+    toc: TRUE
+    code_folding: "show"
+---
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood_1.gif")
+
+include_graphics(path = "../CouvyDuchesne_ISGW_BCD_likelihood2.gif")
+
+```
+
+# Likelihood function
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 4, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 5, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 6, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 7, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 8, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 9, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 10, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 11, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 12, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 13, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 14, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 15, ".gif"))
+
+
+```
+
+# Estimate parameters of the model
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 17, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 18, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 19, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 20, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 21, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 22, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 23, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 24, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 25, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 26, ".gif"))
+
+```
+
+# Significance testing and goodness of fit
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 28, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 29, ".gif"))
+
+
+```
+
+
+# Conclusions
+
+```{R, echo=FALSE, message=FALSE, hide=T, fig.show="hold"}
+
+library(knitr)
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 51, ".gif"))
+include_graphics(path = paste0("../CouvyDuchesne_ISGW_BCD_likelihood", 52, ".gif"))
+
+
+
+```
