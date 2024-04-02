@@ -19,7 +19,6 @@ library(epuRate)      # devtools::install_github("baptisteCD/epuRate", force=TRU
 # Soft-wrap code in knitting
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
    
-
 ```
 
 <br><br><br><br>
